@@ -1,5 +1,9 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>天井割付ツール</title>
-<meta name="claude:viewport-fit-sides" content="cover">
 <style>
 /* Layout: 左に操作パネル、右に製図板風の作図面。狭い幅では縦積み。 */
 :root{
@@ -86,8 +90,10 @@ svg .rm{stroke:var(--room);fill:none;stroke-width:2.2;vector-effect:non-scaling-
 svg text{fill:var(--fg);font-family:var(--ff-ui)}
 
 /* ===== コンパクト化: 画面固定 + タブ ===== */
+:root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
 html,body{height:100%}
-body{height:100vh;height:100dvh;overflow:hidden;display:flex;flex-direction:column;padding-block:8px;font-size:13px;line-height:1.45}
+body{overflow:hidden;display:flex;flex-direction:column;padding-block:8px;font-size:13px;line-height:1.45}
 .top{display:flex;align-items:baseline;gap:10px;flex:none;margin-bottom:6px;min-width:0}
 .top h1{font-size:16px;margin:0;white-space:nowrap}
 .top .sub{margin:0;font-size:12px;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -129,6 +135,8 @@ th,td{padding:4px 6px;font-size:12px}
 }
 @media (max-height:520px) and (min-width:861px){.top .sub{display:none}}
 </style>
+</head>
+<body>
 
 <header class="top">
   <h1>天井割付ツール</h1>
@@ -187,10 +195,17 @@ th,td{padding:4px 6px;font-size:12px}
 
       <section class="tp" role="tabpanel" id="p-save" aria-labelledby="t-save" hidden>
         <div class="btns">
+          <button class="pri sa" id="dljww" hidden>JWW(割付線のみ)</button>
+          <button class="sa" id="dljww2" hidden>JWW(元の線+割付)</button>
+          <button class="sa" id="dldxf" hidden>DXF</button>
           <button class="pri" id="dlzip">JWW + DXF (ZIP)</button>
           <button id="dlsvg">SVG</button>
         </div>
-        <p class="note" id="dlnote">JWWは保存できる拡張子に含まれないため、ZIPに入れて渡します。展開した .jww をJw_cadで開き、E-Fレイヤの割付線を範囲選択してコピーし、元図面へ貼り付けてください。</p>
+        <div class="grp">入れ込み先のJWW(任意)</div>
+        <div class="btns"><button type="button" id="tgtbtn">入れ込み先JWWを選択</button><button type="button" class="pri" id="dlmerge" disabled>割付線を追加して保存</button></div>
+        <input type="file" id="tgtfile" accept=".jww" hidden>
+        <p class="note" id="tgtinfo">未選択。選ぶと、その図面の中へ割付線を直接追加したJWWを作ります(元の内容はそのまま)。</p>
+        <p class="note" id="dlnote">ZIPに3点入ります。<br>・*_lines_only.jww … 割付線だけ(他の図面へ入れ込む用)<br>・*_with_plan.jww … 元の線+割付線<br>・*.dxf … 確認用<br>※JWWは直接保存できない拡張子のためZIPで渡します。展開して Jw_cad で開き、割付線(E-Fレイヤ)を範囲選択→コピー→入れ込み先の図面へ貼り付けてください。元図面と同じ原点・縮尺で出力されるため、同じ位置に重なります。</p>
       </section>
     </div>
     <div class="msg" id="warn" hidden></div>
@@ -247,7 +262,7 @@ function parseJww(buf){
  try{lines=walk(buf,ver,listPos)}catch(e){warn.push('図形リストを完全には解析できなかったため、線のみ検索して読み込みました。');lines=carve(buf,ver,listPos)}
  return{buf,u8,ver,scales,listPos,lines,warn};
 }
-function walk(buf,ver,pos){
+function walk(buf,ver,pos,info){
  const r=new R(buf);r.p=pos;const n=r.u16();const cls={};let mc=1;const out=[];
  for(let k=0;k<n;k++){
   const tag=r.u16();let name;
@@ -263,6 +278,7 @@ function walk(buf,ver,pos){
   else if(name==='CDataBlock'){r.skip(40);r.u32()}
   else throw new Error('unsupported '+name);
  }
+ if(info){info.n=n;info.end=r.p;info.mc=mc;info.cls=cls}
  return out;
 }
 function carve(buf,ver,pos){
@@ -510,8 +526,8 @@ function bindPan(s){
 }
 
 /* ---------- 出力 ---------- */
-function buildJww(){
- const{ver,u8,listPos}=SRC;const all=[...RESULT.base,...RESULT.newLines];
+function buildJww(linesOnly){
+ const{ver,u8,listPos}=SRC;const all=linesOnly?[...RESULT.newLines]:[...RESULT.base,...RESULT.newLines];
  const hdr=u8.slice(0,listPos);
  const buf=new ArrayBuffer(hdr.length+2+all.length*(2+4+1+2+2+6+32)+8+6+16);
  const dv=new DataView(buf),o8=new Uint8Array(buf);let p=0;
@@ -549,7 +565,17 @@ function zip(files){
  const e=new DataView(new ArrayBuffer(22));e.setUint32(0,0x06054b50,true);e.setUint16(8,files.length,true);e.setUint16(10,files.length,true);e.setUint32(12,cdLen,true);e.setUint32(16,off,true);
  return new Blob([...parts,...cd,new Uint8Array(e.buffer)],{type:'application/zip'});
 }
+const STANDALONE=typeof claude==='undefined'||!claude||typeof claude.use!=='function';
+function browserSave(filename,data){
+ const ext=(filename.split('.').pop()||'').toLowerCase();
+ const mime={jww:'application/octet-stream',dxf:'application/dxf',zip:'application/zip',svg:'image/svg+xml'}[ext]||'application/octet-stream';
+ const blob=data instanceof Blob?data:new Blob([data],{type:mime});
+ const url=URL.createObjectURL(blob),a=document.createElement('a');
+ a.href=url;a.download=filename;document.body.appendChild(a);a.click();a.remove();
+ setTimeout(()=>URL.revokeObjectURL(url),4000);
+}
 async function save(filename,data){
+ if(STANDALONE){browserSave(filename,data);return}
  const dl=await claude.use('downloads');
  if(!dl){flash('この表示では保存機能を使えません。');return}
  try{await dl.save({filename,data})}catch(e){if(e&&e.code!=='declined')flash('保存できませんでした('+(e.code||'error')+')')}
@@ -558,7 +584,18 @@ function flash(t){const el=$('dlnote');el.textContent=t}
 $('dlzip').onclick=()=>{if(!RESULT){flash('先に図面を読み込んでください。');return}
  const stem=(fileName||'plan').replace(/\.jww$/i,'').replace(/[^\w\-]+/g,'_')||'plan';
  const tag=stem+'_ceiling'+matId;
- save(tag+'.zip',zip([{name:tag+'.jww',data:buildJww()},{name:tag+'.dxf',data:buildDxf()}]))};
+ if(!RESULT.newLines.length){flash('割付線がありません。');return}
+ save(tag+'.zip',zip([{name:tag+'_lines_only.jww',data:buildJww(true)},{name:tag+'_with_plan.jww',data:buildJww(false)},{name:tag+'.dxf',data:buildDxf()}]))};
+function outTag(){const stem=(fileName||'plan').replace(/\.jww$/i,'').replace(/[^\w\-]+/g,'_')||'plan';return stem+'_ceiling'+matId}
+function okOut(){if(!RESULT){flash('先に図面を読み込んでください。');return false}if(!RESULT.newLines.length){flash('割付線がありません。');return false}return true}
+$('dljww').onclick=()=>{if(okOut())save(outTag()+'_lines_only.jww',buildJww(true))};
+$('dljww2').onclick=()=>{if(okOut())save(outTag()+'_with_plan.jww',buildJww(false))};
+$('dldxf').onclick=()=>{if(okOut())save(outTag()+'.dxf',buildDxf())};
+if(STANDALONE){
+ document.querySelectorAll('.sa').forEach(b=>b.hidden=false);
+ $('dlzip').classList.remove('pri');
+ $('dlnote').innerHTML='JWW(割付線のみ): 他の図面へ入れ込む用。Jw_cadで開き、E-Fレイヤの割付線を範囲選択してコピー→貼り付け。<br>JWW(元の線+割付): 元の線も含む全体。DXF: JWWが使えない場合の代替。<br>下の「入れ込み先JWW」を使うと、別のJWWへ直接追加した .jww を保存できます。';
+}
 $('dlsvg').onclick=()=>{const s=$('stage').querySelector('svg');if(!s)return;
  const c=s.cloneNode(true);c.setAttribute('xmlns',NS);
  const css='.cf{fill:#dbe8f6}.cc{fill:#fbe0bd}.gl{stroke:#1c5fb0;fill:none;stroke-width:1;vector-effect:non-scaling-stroke}.gl.ch{stroke:#0f7a6b}.rm{stroke:#c23b2e;fill:none;stroke-width:2.2;vector-effect:non-scaling-stroke}text{fill:#1d242c;font-family:sans-serif}';
@@ -568,6 +605,59 @@ $('dlsvg').onclick=()=>{const s=$('stage').querySelector('svg');if(!s)return;
  save('ceiling_layout.svg',new XMLSerializer().serializeToString(c))};
 
 /* ---------- UI ---------- */
+/* ---------- 入れ込み先JWWへの追記 ---------- */
+let TGT=null,TGTOK=false,DLOK=true;
+function updMerge(){$('dlmerge').disabled=!(TGTOK&&DLOK)}
+function mergeJww(tgt,lines){
+ if(tgt.warn.length)throw new Error('図形リストを完全には解析できないファイルです');
+ const info={};walk(tgt.buf,tgt.ver,tgt.listPos,info);
+ const src=tgt.u8,ver=tgt.ver;
+ for(let i=info.end;i<src.length;i++)if(src[i]!==0)throw new Error('ブロック定義などの付属データがあり、安全に追記できません(割付線のみJWWを貼り付けてください)');
+ const n=info.n+lines.length;if(n>65535)throw new Error('図形数が多すぎます');
+ const k=Object.keys(info.cls).find(x=>info.cls[x]==='CDataSen');let idx=k==null?null:+k,mc=info.mc;
+ const nb=new ArrayBuffer(80*lines.length+16),dv=new DataView(nb),o=new Uint8Array(nb);let p=0;
+ for(const e of lines){
+  if(idx==null){dv.setUint16(p,0xFFFF,true);dv.setUint16(p+2,ver&0xFFFF,true);dv.setUint16(p+4,8,true);p+=6;for(const ch of'CDataSen')o[p++]=ch.charCodeAt(0);idx=mc;mc++}
+  else{dv.setUint16(p,0x8000|idx,true);p+=2}
+  mc++;
+  dv.setUint32(p,0,true);p+=4;o[p++]=e.style||1;dv.setUint16(p,e.color,true);p+=2;
+  if(ver>=351){dv.setUint16(p,e.width||0,true);p+=2}
+  dv.setUint16(p,e.layer,true);dv.setUint16(p+2,e.glayer,true);dv.setUint16(p+4,0,true);p+=6;
+  for(const v of e.xy){dv.setFloat64(p,v,true);p+=8}
+ }
+ const out=new Uint8Array(src.length+p);
+ out.set(src.subarray(0,tgt.listPos),0);
+ new DataView(out.buffer).setUint16(tgt.listPos,n,true);
+ out.set(src.subarray(tgt.listPos+2,info.end),tgt.listPos+2);
+ out.set(o.subarray(0,p),info.end);
+ out.set(src.subarray(info.end),info.end+p);
+ const chk=parseJww(out.buffer),ci={};
+ if(chk.warn.length||chk.lines.length!==tgt.lines.length+lines.length)throw new Error('追記後の検証に失敗しました');
+ walk(out.buffer,ver,tgt.listPos,ci);if(ci.n!==n||ci.end!==info.end+p)throw new Error('追記後の検証に失敗しました');
+ return out;
+}
+function stemOf(n,d){return(n||d).replace(/\.jww$/i,'').replace(/[^\w\-]+/g,'_')||d}
+$('tgtbtn').onclick=()=>$('tgtfile').click();
+$('tgtfile').onchange=e=>{const f=e.target.files[0];e.target.value='';if(!f)return;
+ f.arrayBuffer().then(b=>{
+  try{const t=parseJww(b);mergeJww(t,[]);TGT=t;TGT.name=f.name;TGTOK=true;
+   const g=(layerSpec($('dst').value)||[0])[0];
+   let m=`${f.name} / 線${t.lines.length}本 / 縮尺 1/${t.scales[g]}`;
+   if(RESULT&&t.scales[g]!==RESULT.scale)m+=`(元図面は1/${RESULT.scale}。位置は実寸で換算して追加します)`;
+   $('tgtinfo').textContent=m}
+  catch(err){TGT=null;TGTOK=false;$('tgtinfo').textContent='使えません: '+err.message}
+  updMerge()}).catch(()=>{TGT=null;TGTOK=false;$('tgtinfo').textContent='読み込めませんでした。';updMerge()})};
+$('dlmerge').onclick=()=>{
+ const msg=t=>{$('tgtinfo').textContent=t};
+ if(!TGT||!RESULT){msg('先に図面と入れ込み先を読み込んでください。');return}
+ if(!RESULT.newLines.length){msg('割付線がありません。');return}
+ try{
+  const lines=RESULT.newLines.map(e=>{const ts=TGT.scales[e.glayer];if(!(ts>0))throw new Error('入れ込み先の縮尺を取得できません');
+   const k=RESULT.scale/ts;return{...e,xy:e.xy.map(v=>v*k)}});
+  const out=mergeJww(TGT,lines),stem=stemOf(TGT.name,'target');
+  msg(`${TGT.name}: 割付線${lines.length}本を追加しました。保存してください。`);
+  STANDALONE?save(stem+'_merged.jww',out):save(stem+'_merged.zip',zip([{name:stem+'_merged.jww',data:out}]))
+ }catch(err){msg('追記できませんでした: '+err.message)}};
 (function initMats(){
  const el=$('mats');let last='';
  for(const m of MATS){if(m.g!==last){const g=document.createElement('div');g.className='grp';g.textContent=m.g;el.append(g);last=m.g}
@@ -599,8 +689,10 @@ $('file').onchange=e=>{const f=e.target.files[0];if(f)f.arrayBuffer().then(b=>lo
 ['dragleave','drop'].forEach(t=>drop.addEventListener(t,e=>{e.preventDefault();drop.classList.remove('over')}));
 drop.addEventListener('drop',e=>{const f=e.dataTransfer.files[0];if(f)f.arrayBuffer().then(b=>load(b,f.name))});
 (function(){const bin=atob(SAMPLE_B64),u=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)u[i]=bin.charCodeAt(i);load(u.buffer,'サンプル図面.jww')})();
-(typeof claude!=='undefined'?claude.use('downloads'):Promise.resolve(null)).then(d=>{if(!d){$('dlzip').disabled=true;$('dlsvg').disabled=true;$('dlnote').textContent='この表示では保存機能を使えません。Claudeアプリで開くと保存できます。'}}).catch(()=>{});
+if(!STANDALONE)(typeof claude!=='undefined'?claude.use('downloads'):Promise.resolve(null)).then(d=>{if(!d){DLOK=false;updMerge();$('dlzip').disabled=true;$('dlsvg').disabled=true;$('dlnote').textContent='この表示では保存機能を使えません。公開URLをClaudeにログインした状態で開くと保存できます。'}}).catch(()=>{});
 
 
 try{if(window.ResizeObserver)new ResizeObserver(()=>{try{applyVb()}catch(e){}}).observe($('stage'))}catch(e){}
 </script>
+</body>
+</html>

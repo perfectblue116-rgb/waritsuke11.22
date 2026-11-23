@@ -236,6 +236,10 @@ svg.th{width:34px;height:24px;flex:none;cursor:default}
           <label class="f" for="fxrot">回転(度・反時計回り)<input type="text" id="fxrot" value="0" inputmode="decimal" autocomplete="off"></label>
           <label class="chk" id="fxlockw" style="margin-top:20px"><input type="checkbox" id="fxlock"> 縦横比を固定</label>
         </div>
+        <div class="row">
+          <label class="f" for="fxcol">線の色(図形を選択中=その図形のみ / 未選択=この種類すべて)<input type="color" id="fxcol" style="width:100%;height:34px;padding:2px"></label>
+          <button type="button" id="fxcolreset" class="reset" style="position:static;align-self:end;margin-bottom:2px">色を戻す</button>
+        </div>
         <div class="grp">吸着(芯合わせ)</div>
         <div class="fseg" role="group" aria-label="吸着">
           <button type="button" data-snap="auto" aria-pressed="true">板芯+目地芯</button><button type="button" data-snap="center" aria-pressed="false">板芯</button><button type="button" data-snap="joint" aria-pressed="false">目地芯</button><button type="button" data-snap="off" aria-pressed="false">なし</button>
@@ -713,7 +717,7 @@ if(STANDALONE){
 }
 $('dlsvg').onclick=()=>{const s=$('stage').querySelector('svg');if(!s)return;
  const c=s.cloneNode(true);c.setAttribute('xmlns',NS);c.querySelectorAll('.ghost,.sg,.gd').forEach(n=>n.remove());c.querySelectorAll('.sel').forEach(n=>n.classList.remove('sel'));
- const css='.cf{fill:#dbe8f6}.cc{fill:#fbe0bd}.gl{stroke:#1c5fb0;fill:none;stroke-width:1;vector-effect:non-scaling-stroke}.gl.ch{stroke:#0f7a6b}.rm{stroke:#c23b2e;fill:none;stroke-width:2.2;vector-effect:non-scaling-stroke}text{fill:#1d242c;font-family:sans-serif}.fx{stroke:#7a2fb0;fill:none;stroke-width:1.3;vector-effect:non-scaling-stroke}.fxb{fill:#fbfcfd;fill-opacity:.7;stroke:none}.fxm{fill:#fbfcfd;stroke:none}.fxc{stroke:#7a2fb0;stroke-width:.8;vector-effect:non-scaling-stroke}';
+ const css='.cf{fill:#dbe8f6}.cc{fill:#fbe0bd}.gl{stroke:#1c5fb0;fill:none;stroke-width:1;vector-effect:non-scaling-stroke}.gl.ch{stroke:#0f7a6b}.rm{stroke:#c23b2e;fill:none;stroke-width:2.2;vector-effect:non-scaling-stroke}text{fill:#1d242c;font-family:sans-serif}.fx{stroke:var(--fx,#7a2fb0);fill:none;stroke-width:1.3;vector-effect:non-scaling-stroke}.fxb{fill:#fbfcfd;fill-opacity:.7;stroke:none}.fxm{fill:#fbfcfd;stroke:none}.fxc{stroke:var(--fx,#7a2fb0);stroke-width:.8;vector-effect:non-scaling-stroke}';
  c.setAttribute('viewBox',`${fullVb.x} ${fullVb.y} ${fullVb.w} ${fullVb.h}`);
  c.setAttribute('width','1600');c.setAttribute('height',String(Math.round(1600*fullVb.h/fullVb.w)));
  c.insertAdjacentHTML('afterbegin',`<style>${css}</style><rect x="${fullVb.x}" y="${fullVb.y}" width="${fullVb.w}" height="${fullVb.h}" fill="#fbfcfd"/>`);
@@ -728,6 +732,15 @@ const saveSyms=()=>{try{localStorage.setItem('ceilFxSyms',JSON.stringify(USYM))}
 const allSyms=()=>[...BUILTIN,...USYM];
 const symOf=id=>allSyms().find(s=>s.id===id);
 const defSize=s=>s.kind==='circle'?[s.d,s.d]:s.kind==='rect'?[s.w,s.h]:[Math.round(s.w0),Math.round(s.h0)];
+let SYMCOL={};try{const j=JSON.parse(localStorage.getItem('ceilFxCol')||'{}');if(j&&typeof j==='object')SYMCOL=j}catch(e){}
+const saveCol=()=>{try{localStorage.setItem('ceilFxCol',JSON.stringify(SYMCOL))}catch(e){}};
+const HEXRE=/^#[0-9a-fA-F]{6}$/;
+const colOf=p=>(p&&HEXRE.test(p.color||'')&&p.color)||(p&&HEXRE.test(SYMCOL[p.sym]||'')&&SYMCOL[p.sym])||null;
+const defCol=()=>{const v=getComputedStyle(document.documentElement).getPropertyValue('--fx').trim();return HEXRE.test(v)?v:'#7a2fb0'};
+/* 書出用: 近い色をJWWのペン番号 / DXFのACI番号に変換 */
+const JWWPEN=[[1,0,0,0],[2,255,0,0],[3,0,200,0],[4,0,0,255],[5,255,255,0],[6,255,0,255],[7,0,255,255],[9,255,20,147],[10,165,42,42],[11,255,165,0],[12,144,238,144],[13,173,216,230],[14,230,230,250],[15,211,211,211],[16,169,169,169]];
+const ACIPAL=[[1,255,0,0],[2,255,255,0],[3,0,255,0],[4,0,255,255],[5,0,0,255],[6,255,0,255],[7,0,0,0],[8,128,128,128],[9,192,192,192]];
+function nearPal(hex,pal){const r=parseInt(hex.slice(1,3),16),g=parseInt(hex.slice(3,5),16),b=parseInt(hex.slice(5,7),16);let best=pal[0][0],bd=1e9;for(const[n,R,G,B]of pal){const d=(r-R)**2+(g-G)**2+(b-B)**2;if(d<bd){bd=d;best=n}}return best}
 const FX={tool:'pan',snap:'auto',thr:16,cur:{sym:'b-dl',w:120,h:120,rot:0},list:[],sel:null,ghost:null,mv:null,seq:1};
 const n2=v=>parseFloat(String(v).replace(/[０-９．－]/g,c=>c==='．'?'.':c==='－'?'-':String.fromCharCode(c.charCodeAt(0)-0xFEE0)));
 const fxMsg=t=>{$('fxmsg').textContent=t},regMsg=t=>{$('fxregmsg').textContent=t};
@@ -766,7 +779,8 @@ function primsSvg(P){let h='';
 function symG(s,p,A,cls){
  const w=p.w,h=p.h,t=Math.max(20,Math.min(w,h)*.12);
  const hit=(s.kind==='circle'||s.phi)?`<circle class="fxb" r="${f1(w/2)}"/>`:`<rect class="fxb" x="${f1(-w/2)}" y="${f1(-h/2)}" width="${f1(w)}" height="${f1(h)}"/>`;
- return `<g class="fxs ${cls}" data-pid="${p.id}" transform="translate(${p.x.toFixed(1)},${p.y.toFixed(1)}) rotate(${(p.rot+A).toFixed(3)})">${hit}${primsSvg(localPrims(s,w,h))}${s.builtin?'':`<line class="fxc" x1="${-t}" y1="0" x2="${t}" y2="0"/><line class="fxc" x1="0" y1="${-t}" x2="0" y2="${t}"/>`}</g>`}
+ const col=colOf(p);
+ return `<g class="fxs ${cls}" data-pid="${p.id}"${col?` style="--fx:${col}"`:''} transform="translate(${p.x.toFixed(1)},${p.y.toFixed(1)}) rotate(${(p.rot+A).toFixed(3)})">${hit}${primsSvg(localPrims(s,w,h))}${s.builtin?'':`<line class="fxc" x1="${-t}" y1="0" x2="${t}" y2="0"/><line class="fxc" x1="0" y1="${-t}" x2="0" y2="${t}"/>`}</g>`}
 function fxHtml(){
  const A=RESULT?RESULT.ang*180/Math.PI:0;let h='';
  const G=FX.guide;
@@ -779,7 +793,7 @@ function fxHtml(){
  if(g&&RESULT){const R=RESULT.ang,[bx0,bx1,by0,by1]=g.o.lay.bbox;
   const gl=(a,b)=>{const p=rot(a,R),q=rot(b,R);return `<line class="sg" x1="${p[0].toFixed(1)}" y1="${p[1].toFixed(1)}" x2="${q[0].toFixed(1)}" y2="${q[1].toFixed(1)}"/>`};
   if(g.sx)h+=gl([g.sx.v,by0],[g.sx.v,by1]);if(g.sy)h+=gl([bx0,g.sy.v],[bx1,g.sy.v]);
-  if(FX.tool==='place'){const s=symOf(FX.cur.sym);if(s)h+=symG(s,{id:0,x:g.x,y:g.y,w:FX.cur.w,h:FX.cur.h,rot:FX.cur.rot},A,'ghost')}}
+  if(FX.tool==='place'){const s=symOf(FX.cur.sym);if(s)h+=symG(s,{id:0,sym:FX.cur.sym,color:FX.cur.color,x:g.x,y:g.y,w:FX.cur.w,h:FX.cur.h,rot:FX.cur.rot},A,'ghost')}}
  return h}
 /* --- 図形と重なる割付線を消す: 領域=円(Φ図形)または幅×高さの矩形(本体寸法) --- */
 function fxRegions(){
@@ -867,7 +881,7 @@ const curTarget=()=>FX.sel?(FX.list.find(p=>p.id===FX.sel)||FX.cur):FX.cur;
 function syncInputs(){
  const t=curTarget(),s=symOf(t.sym)||BUILTIN[3],c=s.kind==='circle'||!!s.phi;
  $('fxwl').textContent=c?'外径Φ(mm)':'幅(mm)';$('fxhw').hidden=c;$('fxlockw').hidden=s.kind!=='cad'||c;
- $('fxw').value=num(t.w);$('fxh').value=num(t.h);$('fxrot').value=num(t.rot)}
+ $('fxw').value=num(t.w);$('fxh').value=num(t.h);$('fxrot').value=num(t.rot);$('fxcol').value=colOf(t)||defCol()}
 function onSize(which){
  const t=curTarget(),s=symOf(t.sym);if(!s)return;
  const v=n2($(which==='w'?'fxw':'fxh').value);
@@ -877,10 +891,15 @@ function onSize(which){
  else t[which]=v;
  syncInputs();drawFx()}
 function onRot(){const t=curTarget(),v=n2($('fxrot').value);t.rot=Number.isFinite(v)?((v%360)+360)%360:0;syncInputs();drawFx()}
+function onCol(){const t=curTarget(),v=$('fxcol').value;if(!HEXRE.test(v))return;
+ if(FX.sel)t.color=v;else{SYMCOL[t.sym]=v;saveCol();renderFxList()}
+ drawFx()}
+function resetCol(){const t=curTarget();if(FX.sel)delete t.color;else{delete SYMCOL[t.sym];saveCol();renderFxList()}syncInputs();drawFx()}
 function rotate90(){const t=curTarget();t.rot=((t.rot||0)+90)%360;syncInputs();drawFx()}
 function pickSym(id){const s=symOf(id);if(!s)return;const d=defSize(s);FX.cur={sym:id,w:d[0],h:d[1],rot:FX.cur.rot||0};FX.sel=null;syncInputs();setTool('place');
  fxMsg(`「${s.name}」を選択中。図面上をクリックして配置(Escで終了)。`)}
-const thumb=s=>{const d=defSize(s),w=d[0],h=d[1],P=localPrims(s,w,h);let m=Math.max(w,h)*.58;for(const q of P){const v=q.t==='l'?q.p:q.t==='c'?[Math.abs(q.x)+q.r,Math.abs(q.y)+q.r]:q.t==='a'?[Math.abs(q.x)+q.r,Math.abs(q.y)+q.r]:q.pts.flat();for(const t of v)m=Math.max(m,Math.abs(t)*1.04)}return `<svg class="th" viewBox="${-m} ${-m} ${m*2} ${m*2}"><g transform="scale(1,-1)">${primsSvg(P)}</g></svg>`};const thumbOld=s=>{const d=defSize(s),w=d[0],h=d[1],m=Math.max(w,h)*.58;return `<svg class="th" viewBox="${-m} ${-m} ${m*2} ${m*2}"><g transform="scale(1,-1)">${primsSvg(localPrims(s,w,h))}</g></svg>`};
+const thumbCol=s=>{const c=colOf({sym:s.id});return c?` style="--fx:${c}"`:''};
+const thumb=s=>{const d=defSize(s),w=d[0],h=d[1],P=localPrims(s,w,h);let m=Math.max(w,h)*.58;for(const q of P){const v=q.t==='l'?q.p:q.t==='c'?[Math.abs(q.x)+q.r,Math.abs(q.y)+q.r]:q.t==='a'?[Math.abs(q.x)+q.r,Math.abs(q.y)+q.r]:q.pts.flat();for(const t of v)m=Math.max(m,Math.abs(t)*1.04)}return `<svg class="th"${thumbCol(s)} viewBox="${-m} ${-m} ${m*2} ${m*2}"><g transform="scale(1,-1)">${primsSvg(P)}</g></svg>`};const thumbOld=s=>{const d=defSize(s),w=d[0],h=d[1],m=Math.max(w,h)*.58;return `<svg class="th" viewBox="${-m} ${-m} ${m*2} ${m*2}"><g transform="scale(1,-1)">${primsSvg(localPrims(s,w,h))}</g></svg>`};
 function renderFxList(){
  const el=$('fxlist');el.innerHTML='';
  const cats=[...FXCATS,...new Set(allSyms().map(s=>s.cat).filter(c=>!FXCATS.includes(c)))];
@@ -953,29 +972,32 @@ async function fxRegister(files){
 /* --- 出力用(JWW・DXF) --- */
 function worldPrims(){
  const R=RESULT,out=[];if(!R)return out;
- for(const p of FX.list){const s=symOf(p.sym);if(!s)continue;const a=R.ang+p.rot*Math.PI/180,ad=a*180/Math.PI;
+ for(const p of FX.list){const s=symOf(p.sym);if(!s)continue;const a=R.ang+p.rot*Math.PI/180,ad=a*180/Math.PI,n0=out.length,pc=colOf(p);
   const T=(x,y)=>{const q=rot([x,y],a);return[q[0]+p.x,q[1]+p.y]};
   for(const q of localPrims(s,p.w,p.h)){
    if(q.t==='l')out.push({t:'l',a:T(q.p[0],q.p[1]),b:T(q.p[2],q.p[3])});
    else if(q.t==='c')out.push({t:'c',c:T(q.x,q.y),r:q.r});
    else if(q.t==='a')out.push({t:'a',c:T(q.x,q.y),r:q.r,a0:q.a0+ad,a1:q.a1+ad});
-   else for(let i=0;i<q.pts.length-(q.closed?0:1);i++){const u=q.pts[i],v=q.pts[(i+1)%q.pts.length];out.push({t:'l',a:T(u[0],u[1]),b:T(v[0],v[1])})}}}
+   else for(let i=0;i<q.pts.length-(q.closed?0:1);i++){const u=q.pts[i],v=q.pts[(i+1)%q.pts.length];out.push({t:'l',a:T(u[0],u[1]),b:T(v[0],v[1])})}}
+  for(let i=n0;i<out.length;i++)out[i].col=pc}
  return out}
 function fixtureItems(){
  if(!RESULT||!FX.list.length)return[];
  const sc=RESULT.scale,sp=layerSpec($('fxl').value)||layerSpec($('dst').value)||[14,15];
  const base={layer:sp[1],glayer:sp[0],color:6,style:1,width:0},TP=Math.PI*2,out=[];
  for(const q of worldPrims()){
-  if(q.t==='l')out.push({...base,t:'sen',xy:[q.a[0]/sc,q.a[1]/sc,q.b[0]/sc,q.b[1]/sc]});
-  else if(q.t==='c')out.push({...base,t:'enko',c:[q.c[0]/sc,q.c[1]/sc],r:q.r/sc,a0:0,sw:TP,full:1});
+  const cc=q.col?{color:nearPal(q.col,JWWPEN)}:{};
+  if(q.t==='l')out.push({...base,...cc,t:'sen',xy:[q.a[0]/sc,q.a[1]/sc,q.b[0]/sc,q.b[1]/sc]});
+  else if(q.t==='c')out.push({...base,...cc,t:'enko',c:[q.c[0]/sc,q.c[1]/sc],r:q.r/sc,a0:0,sw:TP,full:1});
   else{const a0=(((q.a0%360)+360)%360)*Math.PI/180;let sw=((((q.a1-q.a0)%360)+360)%360)*Math.PI/180;if(sw<1e-9)sw=TP;
-   out.push({...base,t:'enko',c:[q.c[0]/sc,q.c[1]/sc],r:q.r/sc,a0,sw,full:0})}}
+   out.push({...base,...cc,t:'enko',c:[q.c[0]/sc,q.c[1]/sc],r:q.r/sc,a0,sw,full:0})}}
  return out}
 function fixtureDxf(o){
  for(const q of worldPrims()){
-  if(q.t==='l')o.push('0','LINE','8','FIXTURE','10',q.a[0].toFixed(3),'20',q.a[1].toFixed(3),'30','0.0','11',q.b[0].toFixed(3),'21',q.b[1].toFixed(3),'31','0.0');
-  else if(q.t==='c')o.push('0','CIRCLE','8','FIXTURE','10',q.c[0].toFixed(3),'20',q.c[1].toFixed(3),'30','0.0','40',q.r.toFixed(3));
-  else o.push('0','ARC','8','FIXTURE','10',q.c[0].toFixed(3),'20',q.c[1].toFixed(3),'30','0.0','40',q.r.toFixed(3),'50',(((q.a0%360)+360)%360).toFixed(3),'51',(((q.a1%360)+360)%360).toFixed(3))}}
+  const cz=q.col?['62',String(nearPal(q.col,ACIPAL))]:[];
+  if(q.t==='l')o.push('0','LINE','8','FIXTURE',...cz,'10',q.a[0].toFixed(3),'20',q.a[1].toFixed(3),'30','0.0','11',q.b[0].toFixed(3),'21',q.b[1].toFixed(3),'31','0.0');
+  else if(q.t==='c')o.push('0','CIRCLE','8','FIXTURE',...cz,'10',q.c[0].toFixed(3),'20',q.c[1].toFixed(3),'30','0.0','40',q.r.toFixed(3));
+  else o.push('0','ARC','8','FIXTURE',...cz,'10',q.c[0].toFixed(3),'20',q.c[1].toFixed(3),'30','0.0','40',q.r.toFixed(3),'50',(((q.a0%360)+360)%360).toFixed(3),'51',(((q.a1%360)+360)%360).toFixed(3))}}
 
 /* --- 仮線(ピッチ割り): 出力には含めない --- */
 function fxGuideSet(){
@@ -998,7 +1020,7 @@ $('fxgshow').onchange=()=>{if(FX.guide){FX.guide.show=$('fxgshow').checked;drawF
  $('fxrot90').onclick=rotate90;$('fxdel').onclick=fxDelete;
  let clr=0;$('fxclr').onclick=()=>{const b=$('fxclr');if(!clr){b.textContent='もう一度で全削除';clr=setTimeout(()=>{clr=0;b.textContent='全削除'},3000);return}
   clearTimeout(clr);clr=0;b.textContent='全削除';FX.list=[];FX.sel=null;syncInputs();drawFx();fxMsg('配置した器具をすべて削除しました。')};
- $('fxw').addEventListener('change',()=>onSize('w'));$('fxh').addEventListener('change',()=>onSize('h'));$('fxrot').addEventListener('change',onRot);
+ $('fxw').addEventListener('change',()=>onSize('w'));$('fxh').addEventListener('change',()=>onSize('h'));$('fxrot').addEventListener('change',onRot);$('fxcol').addEventListener('input',onCol);$('fxcolreset').addEventListener('click',resetCol);
  document.querySelectorAll('.fseg button').forEach(b=>b.onclick=()=>{FX.snap=b.dataset.snap;document.querySelectorAll('.fseg button').forEach(x=>x.setAttribute('aria-pressed',String(x===b)))});
  $('fxreg').onclick=()=>$('fxregfile').click();
  $('fxregfile').onchange=e=>{const fs=[...e.target.files];e.target.value='';if(fs.length)fxRegister(fs)};

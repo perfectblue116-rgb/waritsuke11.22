@@ -136,6 +136,27 @@ th,td{padding:4px 6px;font-size:12px}
 }
 @media (max-height:520px) and (min-width:861px){.top .sub{display:none}}
 .top .ver{font-size:10.5px;color:var(--muted);white-space:nowrap;border:1px solid var(--line);border-radius:3px;padding:0 4px}
+
+/* ===== 器具配置 ===== */
+:root{--fx:#7a2fb0;--sg:#d6249f}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--fx:#c79bf2;--sg:#ff7ad1}}
+:root[data-theme="dark"]{--fx:#c79bf2;--sg:#ff7ad1}
+svg .fx{stroke:var(--fx);fill:none;stroke-width:1.3;vector-effect:non-scaling-stroke;stroke-linejoin:round}
+svg .fxb{fill:var(--sheet);fill-opacity:.7;stroke:none}
+svg .fxc{stroke:var(--fx);stroke-width:.8;opacity:.8;vector-effect:non-scaling-stroke}
+svg .fxs.sel .fx,svg .fxs.sel .fxc{stroke:var(--accent);stroke-width:2.6}
+svg .fxs.sel .fxb{fill:var(--cut);fill-opacity:.5}
+svg .ghost{opacity:.65;pointer-events:none}
+svg .sg{stroke:var(--sg);stroke-width:1;stroke-dasharray:6 4;fill:none;vector-effect:non-scaling-stroke;pointer-events:none}
+.stage.fxplace svg{cursor:crosshair}.stage.fxsel svg{cursor:default}
+.stage.fxplace .fxs{pointer-events:none}
+.stage.fxplace,.stage.fxsel{outline:2px solid var(--fx);outline-offset:-2px}
+svg.th{width:34px;height:24px;flex:none;cursor:default}
+.fseg{display:flex;margin-top:4px}
+.fseg button{flex:1;border-radius:0;margin-left:-1px;padding:5px 2px;font-size:12px}
+.fseg button:first-child{border-radius:5px 0 0 5px;margin-left:0}
+.fseg button:last-child{border-radius:0 5px 5px 0}
+.fseg button[aria-pressed=true]{background:var(--accent);color:var(--accent-fg);border-color:var(--accent);font-weight:600}
 </style>
 </head>
 <body>
@@ -144,7 +165,7 @@ th,td{padding:4px 6px;font-size:12px}
   <h1>天井割付ツール</h1>
   <span class="sub">JWWの仕上げライン(既定はE-E)から室を読み取り、天井材の割付を自動作図します。</span>
   <span class="file" id="fname"></span>
-  <span class="ver" title="表示中の版">v3 目地幅対応 11/23</span>
+  <span class="ver" title="表示中の版">v4 器具配置 11/23</span>
 </header>
 
 <div class="app">
@@ -154,6 +175,7 @@ th,td{padding:4px 6px;font-size:12px}
       <button type="button" role="tab" id="t-mat" aria-controls="p-mat" aria-selected="false" tabindex="-1">天井材</button>
       <button type="button" role="tab" id="t-lay" aria-controls="p-lay" aria-selected="false" tabindex="-1">割付</button>
       <button type="button" role="tab" id="t-core" aria-controls="p-core" aria-selected="false" tabindex="-1">芯</button>
+      <button type="button" role="tab" id="t-fx" aria-controls="p-fx" aria-selected="false" tabindex="-1">器具</button>
       <button type="button" role="tab" id="t-res" aria-controls="p-res" aria-selected="false" tabindex="-1">結果</button>
       <button type="button" role="tab" id="t-save" aria-controls="p-save" aria-selected="false" tabindex="-1">保存</button>
     </div>
@@ -190,6 +212,47 @@ th,td{padding:4px 6px;font-size:12px}
         <div class="btns" style="margin-top:8px"><button type="button" class="tg" id="pick" aria-pressed="false">壁2面から芯を指定</button><button type="button" id="autocore">芯を自動に戻す</button></div>
         <p class="note" id="pickmsg">図の壁を同じ向きに2面クリックすると、その中間が芯になります。</p>
         <p class="note">芯振り分け: 芯が板の中央。芯マタギ: 芯が目地の位置。</p>
+      </section>
+
+      <section class="tp" role="tabpanel" id="p-fx" aria-labelledby="t-fx" hidden>
+        <div class="btns">
+          <button type="button" class="tg" id="fxplace" aria-pressed="false">配置</button>
+          <button type="button" class="tg" id="fxsel" aria-pressed="false">選択・移動</button>
+          <button type="button" id="fxrot90" title="キー: R">90°回転</button>
+          <button type="button" id="fxdel" title="キー: Delete">削除</button>
+          <button type="button" id="fxclr">全削除</button>
+        </div>
+        <p class="note" id="fxmsg">下の一覧から図形を選ぶと「配置」モードになります。図面上をクリックして配置、「選択・移動」でドラッグ移動できます。</p>
+        <p class="note" id="fxcnt"></p>
+        <div id="fxlist" class="mats"></div>
+        <div class="grp">サイズ(配置中の図形 / 選択中の図形)</div>
+        <div class="row">
+          <label class="f" for="fxw"><span id="fxwl">幅(mm)</span><input type="text" id="fxw" inputmode="decimal" autocomplete="off"></label>
+          <label class="f" for="fxh" id="fxhw">高さ(mm)<input type="text" id="fxh" inputmode="decimal" autocomplete="off"></label>
+        </div>
+        <div class="row">
+          <label class="f" for="fxrot">回転(度・反時計回り)<input type="text" id="fxrot" value="0" inputmode="decimal" autocomplete="off"></label>
+          <label class="chk" id="fxlockw" style="margin-top:20px"><input type="checkbox" id="fxlock"> 縦横比を固定</label>
+        </div>
+        <div class="grp">吸着(芯合わせ)</div>
+        <div class="fseg" role="group" aria-label="吸着">
+          <button type="button" data-snap="auto" aria-pressed="true">板芯+目地芯</button><button type="button" data-snap="center" aria-pressed="false">板芯</button><button type="button" data-snap="joint" aria-pressed="false">目地芯</button><button type="button" data-snap="off" aria-pressed="false">なし</button>
+        </div>
+        <p class="note">図形の中心が、X・Y方向それぞれ「目地の芯」または「天井仕上材の芯(910×910なら455,455/910×1820なら455,910)」へ近い方に自動で吸着します。紫の破線が吸着した芯です。</p>
+        <div class="grp">図形を登録(CAD)</div>
+        <div class="row">
+          <label class="f" for="fxcat">分類<select id="fxcat"></select></label>
+          <label class="f" for="fxnm">名称<input type="text" id="fxnm" placeholder="空欄=ファイル名" autocomplete="off"></label>
+        </div>
+        <div class="row">
+          <label class="f" for="fxk">倍率(単位mmなら1)<input type="text" id="fxk" value="1" inputmode="decimal" autocomplete="off"></label>
+          <label class="f" for="fxlf">取込レイヤ(JWWのみ)<input type="text" id="fxlf" placeholder="空欄=全部 例 0-0" autocomplete="off"></label>
+        </div>
+        <div class="btns" style="margin-top:6px"><button type="button" class="pri" id="fxreg">DXF / JWWを登録</button><button type="button" id="fxexp">登録図形を書出</button><button type="button" id="fximp">読込</button></div>
+        <input type="file" id="fxregfile" accept=".dxf,.jww" multiple hidden>
+        <input type="file" id="fximpfile" accept=".json" hidden>
+        <p class="note" id="fxregmsg">登録した図形はこのブラウザに保存されます。外径・幅・高さは配置時に自由に変更できます(登録図形は外形寸法が既定値)。</p>
+        <label class="f" for="fxl" style="margin-top:8px">器具の出力レイヤ(JWW/DXF)<input type="text" id="fxl" value="E-D" autocomplete="off"></label>
       </section>
 
       <section class="tp" role="tabpanel" id="p-res" aria-labelledby="t-res" hidden>
@@ -276,7 +339,7 @@ function walk(buf,ver,pos,info){
   else throw new Error('tag');
   mc++;const b=readBase(r,ver);
   if(name==='CDataSen'){b.xy=[r.f64(),r.f64(),r.f64(),r.f64()];out.push(b)}
-  else if(name==='CDataEnko'){r.skip(56);r.u32()}
+  else if(name==='CDataEnko'){const v=[r.f64(),r.f64(),r.f64(),r.f64(),r.f64(),r.f64(),r.f64()],z=r.u32();if(info&&info.enko)info.enko.push({...b,v,z})}
   else if(name==='CDataTen'){r.f64();r.f64();r.u32();if(b.style===100){r.u32();r.f64();r.f64()}}
   else if(name==='CDataMoji'){r.skip(32);r.u32();r.skip(32);r.cstr();r.cstr()}
   else if(name==='CDataSolid'){r.skip(64);if(b.color===10)r.u32()}
@@ -417,7 +480,7 @@ function compute(){
   const wcore=[[rot([lay.cen[0],by0],ang),rot([lay.cen[0],by1],ang)],[rot([bx0,lay.cen[1]],ang),rot([bx1,lay.cen[1]],ang)]];
   const wcells=lay.cells.map(([xa,xb,ya,yb,st])=>({st,pts:[[xa,ya],[xb,ya],[xb,yb],[xa,yb]].map(p=>rot(p,ang))}));
   wseg.forEach(([p,q])=>newLines.push({layer:d[1],glayer:d[0],color:mat.color,style:1,width:0,xy:[p[0]/scale,p[1]/scale,q[0]/scale,q[1]/scale]}));
-  out.push({room:r,lay,wseg,wcells,wstrips,wcore});
+  out.push({room:r,lay,wseg,wcells,wstrips,wcore,led});
  }
   const notes=[];
  if(mat.joint>0&&$('jnote').checked){
@@ -468,7 +531,7 @@ function render(){
   h+=`<text x="${(p[0]+120).toFixed(0)}" y="${(-p[1]-180).toFixed(0)}" font-size="${(fullVb.w/45).toFixed(0)}" font-weight="700">室${o.room.no}</text>`}
  if($('dim').checked)for(const o of out)h+=dimsSvg(o,mat,fs);
  for(const n of RESULT.notes||[])h+=`<g transform="translate(${n.dx.toFixed(1)},${(-n.dy).toFixed(1)}) rotate(${(-n.deg).toFixed(3)})"><text class="jn" x="0" y="0" font-size="${n.dh.toFixed(0)}">${n.label}</text></g>`;
- svg.innerHTML=h;if($('emph').checked)svg.classList.add('emph');st.prepend(svg);applyVb();bindPan(svg);
+ svg.innerHTML=h+'<g id="fxlayer" transform="scale(1,-1)"></g>';if($('emph').checked)svg.classList.add('emph');st.prepend(svg);applyVb();bindPan(svg);drawFx();
  $('zoomj').textContent=mat.joint?'目地を拡大':'芯を拡大';
  $('ttl').textContent='割付結果 / '+(mat.g+' '+mat.name);
  let t='<tr><th>室</th><th>面積(㎡)</th><th>全板</th><th>切板</th><th>端部板X(mm)</th><th>端部板Y(mm)</th><th>ピッチ(mm)</th></tr>';
@@ -527,7 +590,7 @@ function handlePick(cx,cy){
  pickMsg(sel.length===1&&sel[0].axis!==axis?`向きが違うため選び直しました。${axis==='x'?'縦':'横'}の壁をもう1面選んでください。`:`1面目を選択しました。向かい合う${axis==='x'?'縦':'横'}の壁をもう1面クリックしてください。`);
  render();
 }
-$('pick').onclick=()=>{PICK.on=!PICK.on;PICK.sel=[];$('pick').setAttribute('aria-pressed',String(PICK.on));$('stage').classList.toggle('pick',PICK.on);
+$('pick').onclick=()=>{PICK.on=!PICK.on;PICK.sel=[];if(PICK.on)setTool('pan');$('pick').setAttribute('aria-pressed',String(PICK.on));$('stage').classList.toggle('pick',PICK.on);
  pickMsg(PICK.on?'壁を同じ向きに2面クリックしてください。中間が芯になります。拡大・移動はドラッグとホイールです。':'図の壁を同じ向きに2面クリックすると、その中間が芯になります。');if(RESULT)render()};
 $('autocore').onclick=()=>{OVR={};PICK.sel=[];pickMsg('芯を自動(各方向の最長距離の中心)に戻しました。');if(SRC)compute()};
 function applyVb(){const s=$('stage').querySelector('svg');if(!s||!vb)return;
@@ -537,10 +600,11 @@ function applyVb(){const s=$('stage').querySelector('svg');if(!s||!vb)return;
 function bindPan(s){
  let drag=null;
  let moved=0,down=null;
- s.addEventListener('pointerdown',e=>{drag={x:e.clientX,y:e.clientY};down={x:e.clientX,y:e.clientY};moved=0;s.setPointerCapture(e.pointerId)});
- s.addEventListener('pointermove',e=>{if(!drag)return;moved=Math.max(moved,Math.abs(e.clientX-down.x)+Math.abs(e.clientY-down.y));const r=s.getBoundingClientRect();
+ s.addEventListener('pointerdown',e=>{if(fxDown(e,s))return;drag={x:e.clientX,y:e.clientY};down={x:e.clientX,y:e.clientY};moved=0;s.setPointerCapture(e.pointerId)});
+ s.addEventListener('pointermove',e=>{if(FX.mv){fxMove(e);return}if(!drag){if(FX.tool==='place')fxHover(e);return}moved=Math.max(moved,Math.abs(e.clientX-down.x)+Math.abs(e.clientY-down.y));const r=s.getBoundingClientRect();
   vb.x-=(e.clientX-drag.x)*s._w/r.width;vb.y-=(e.clientY-drag.y)*s._h/r.height;drag={x:e.clientX,y:e.clientY};applyVb()});
- const up=e=>{const was=drag;drag=null;if(was&&e&&e.type==='pointerup'&&moved<5&&PICK.on)handlePick(e.clientX,e.clientY)};s.addEventListener('pointerup',up);s.addEventListener('pointercancel',up);
+ const up=e=>{if(FX.mv){fxEnd();return}const was=drag;drag=null;if(was&&e&&e.type==='pointerup'&&moved<5){if(PICK.on)handlePick(e.clientX,e.clientY);else if(FX.tool==='place')fxPlace(e);else if(FX.tool==='sel')fxDeselect()}};
+ s.addEventListener('pointerleave',()=>{if(FX.tool==='place'&&FX.ghost){FX.ghost=null;drawFx()}});s.addEventListener('pointerup',up);s.addEventListener('pointercancel',up);
  s.addEventListener('wheel',e=>{e.preventDefault();const r=s.getBoundingClientRect();
   const mx=s._x+(e.clientX-r.left)/r.width*s._w,my=s._y+(e.clientY-r.top)/r.height*s._h;
   const f=e.deltaY<0?0.85:1/0.85;
@@ -558,17 +622,18 @@ function sjText(t){return Uint8Array.from([...SJ_JIDI,32,...[...t].map(c=>c.char
 function writeEnts(items,ver,st){
  const w=new W();
  for(const e of items){
-  const name=e.t==='moji'?'CDataMoji':'CDataSen';
+  const name=e.t==='moji'?'CDataMoji':e.t==='enko'?'CDataEnko':'CDataSen';
   if(st.idx[name]==null){w.u16(0xFFFF);w.u16(ver&0xFFFF);w.u16(name.length);for(const c of name)w.u8(c.charCodeAt(0));st.idx[name]=st.mc;st.mc++}
   else w.u16(0x8000|st.idx[name]);
   st.mc++;
   w.u32(0);w.u8(e.style||1);w.u16(e.color);if(ver>=351)w.u16(e.width||0);w.u16(e.layer);w.u16(e.glayer);w.u16(0);
   if(e.t==='moji'){w.f64(e.x);w.f64(e.y);w.f64(e.ex);w.f64(e.ey);w.u32(0);w.f64(e.size);w.f64(e.size);w.f64(0);w.f64(e.deg);w.cstr(SJ_FONT);w.cstr(e.bytes)}
+  else if(e.t==='enko'){w.f64(e.c[0]);w.f64(e.c[1]);w.f64(e.r);w.f64(e.a0);w.f64(e.sw);w.f64(0);w.f64(1);w.u32(e.full?1:0)}
   else for(const v of e.xy)w.f64(v);
  }
  return Uint8Array.from(w.a);
 }
-function jwwItems(){const R=RESULT,it=R.newLines.map(e=>({...e,t:'sen'}));for(const n of R.notes||[])it.push({t:'moji',...n});return it}
+function jwwItems(){const R=RESULT,it=R.newLines.map(e=>({...e,t:'sen'}));for(const n of R.notes||[])it.push({t:'moji',...n});for(const f of fixtureItems())it.push(f);return it}
 function buildJww(linesOnly){
  const{ver,u8,listPos}=SRC;
  const items=[...(linesOnly?[]:RESULT.base.map(e=>({...e,t:'sen'}))),...jwwItems()];
@@ -580,10 +645,11 @@ function buildDxf(){
  const{scale,base,newLines}=RESULT;
  const o=['0','SECTION','2','HEADER','9','$ACADVER','1','AC1009','0','ENDSEC','0','SECTION','2','TABLES',
   '0','TABLE','2','LTYPE','70','1','0','LTYPE','2','CONTINUOUS','70','0','3','Solid line','72','65','73','0','40','0.0','0','ENDTAB',
-  '0','TABLE','2','LAYER','70','2','0','LAYER','2','FINISH','70','0','62','1','6','CONTINUOUS','0','LAYER','2','CEILING','70','0','62','5','6','CONTINUOUS','0','ENDTAB','0','ENDSEC','0','SECTION','2','ENTITIES'];
+  '0','TABLE','2','LAYER','70','3','0','LAYER','2','FINISH','70','0','62','1','6','CONTINUOUS','0','LAYER','2','CEILING','70','0','62','5','6','CONTINUOUS','0','LAYER','2','FIXTURE','70','0','62','6','6','CONTINUOUS','0','ENDTAB','0','ENDSEC','0','SECTION','2','ENTITIES'];
  const add=(lay,e)=>o.push('0','LINE','8',lay,'10',(e.xy[0]*scale).toFixed(3),'20',(e.xy[1]*scale).toFixed(3),'30','0.0','11',(e.xy[2]*scale).toFixed(3),'21',(e.xy[3]*scale).toFixed(3),'31','0.0');
  base.forEach(e=>add('FINISH',e));newLines.forEach(e=>add('CEILING',e));
  for(const n of RESULT.notes||[])o.push('0','TEXT','8','CEILING','10',(n.x*scale).toFixed(3),'20',(n.y*scale).toFixed(3),'30','0.0','40',(n.size*scale).toFixed(2),'1',n.ascii,'50',n.deg.toFixed(3));
+ fixtureDxf(o);
  o.push('0','ENDSEC','0','EOF');return new TextEncoder().encode(o.join('\r\n')+'\r\n');
 }
 function crc32(u8){let t=crc32.t;if(!t){t=crc32.t=new Uint32Array(256);for(let n=0;n<256;n++){let c=n;for(let k=0;k<8;k++)c=c&1?0xEDB88320^(c>>>1):c>>>1;t[n]=c>>>0}}
@@ -633,12 +699,261 @@ if(STANDALONE){
  $('dlnote').innerHTML='JWW(割付線のみ): 他の図面へ入れ込む用。Jw_cadで開き、E-Fレイヤの割付線を範囲選択してコピー→貼り付け。<br>JWW(元の線+割付): 元の線も含む全体。DXF: JWWが使えない場合の代替。<br>下の「入れ込み先JWW」を使うと、別のJWWへ直接追加した .jww を保存できます。';
 }
 $('dlsvg').onclick=()=>{const s=$('stage').querySelector('svg');if(!s)return;
- const c=s.cloneNode(true);c.setAttribute('xmlns',NS);
- const css='.cf{fill:#dbe8f6}.cc{fill:#fbe0bd}.gl{stroke:#1c5fb0;fill:none;stroke-width:1;vector-effect:non-scaling-stroke}.gl.ch{stroke:#0f7a6b}.rm{stroke:#c23b2e;fill:none;stroke-width:2.2;vector-effect:non-scaling-stroke}text{fill:#1d242c;font-family:sans-serif}';
+ const c=s.cloneNode(true);c.setAttribute('xmlns',NS);c.querySelectorAll('.ghost,.sg').forEach(n=>n.remove());c.querySelectorAll('.sel').forEach(n=>n.classList.remove('sel'));
+ const css='.cf{fill:#dbe8f6}.cc{fill:#fbe0bd}.gl{stroke:#1c5fb0;fill:none;stroke-width:1;vector-effect:non-scaling-stroke}.gl.ch{stroke:#0f7a6b}.rm{stroke:#c23b2e;fill:none;stroke-width:2.2;vector-effect:non-scaling-stroke}text{fill:#1d242c;font-family:sans-serif}.fx{stroke:#7a2fb0;fill:none;stroke-width:1.3;vector-effect:non-scaling-stroke}.fxb{fill:#fbfcfd;fill-opacity:.7;stroke:none}.fxc{stroke:#7a2fb0;stroke-width:.8;vector-effect:non-scaling-stroke}';
  c.setAttribute('viewBox',`${fullVb.x} ${fullVb.y} ${fullVb.w} ${fullVb.h}`);
  c.setAttribute('width','1600');c.setAttribute('height',String(Math.round(1600*fullVb.h/fullVb.w)));
  c.insertAdjacentHTML('afterbegin',`<style>${css}</style><rect x="${fullVb.x}" y="${fullVb.y}" width="${fullVb.w}" height="${fullVb.h}" fill="#fbfcfd"/>`);
  save('ceiling_layout.svg',new XMLSerializer().serializeToString(c))};
+
+/* ---------- 器具の配置(換気扇・エアコン・スピーカー・照明) ---------- */
+const FXCATS=['換気扇','天井カセットエアコン','スピーカー','照明器具'];
+const BUILTIN=[
+ {id:'b-fan',cat:'換気扇',name:'換気扇(角形)',kind:'rect',style:'fan',w:300,h:300},
+ {id:'b-ac',cat:'天井カセットエアコン',name:'天井カセットエアコン(4方向)',kind:'rect',style:'ac',w:840,h:840},
+ {id:'b-sp',cat:'スピーカー',name:'天井スピーカー',kind:'circle',style:'sp',d:200},
+ {id:'b-dl',cat:'照明器具',name:'ダウンライト',kind:'circle',style:'dl',d:100},
+ {id:'b-fl',cat:'照明器具',name:'蛍光灯(角形)',kind:'rect',style:'fl',w:1200,h:230}];
+let USYM=[];try{const j=JSON.parse(localStorage.getItem('ceilFxSyms')||'[]');if(Array.isArray(j))USYM=j.filter(s=>s&&s.kind==='cad'&&Array.isArray(s.prims))}catch(e){}
+const saveSyms=()=>{try{localStorage.setItem('ceilFxSyms',JSON.stringify(USYM))}catch(e){regMsg('このブラウザでは登録図形を保存できません(書出で控えを取ってください)。')}};
+const allSyms=()=>[...BUILTIN,...USYM];
+const symOf=id=>allSyms().find(s=>s.id===id);
+const defSize=s=>s.kind==='circle'?[s.d,s.d]:s.kind==='rect'?[s.w,s.h]:[Math.round(s.w0),Math.round(s.h0)];
+const FX={tool:'pan',snap:'auto',thr:16,cur:{sym:'b-dl',w:100,h:100,rot:0},list:[],sel:null,ghost:null,mv:null,seq:1};
+const n2=v=>parseFloat(String(v).replace(/[０-９．－]/g,c=>c==='．'?'.':c==='－'?'-':String.fromCharCode(c.charCodeAt(0)-0xFEE0)));
+const fxMsg=t=>{$('fxmsg').textContent=t},regMsg=t=>{$('fxregmsg').textContent=t};
+
+/* --- 図形(局所座標・中心原点・Y上向き) --- */
+function arcPts(x,y,r,a0,a1,step){let s=a1-a0;while(s<=0)s+=360;const n=Math.max(2,Math.ceil(s/step)),o=[];
+ for(let i=0;i<=n;i++){const a=(a0+s*i/n)*Math.PI/180;o.push([x+r*Math.cos(a),y+r*Math.sin(a)])}return o}
+const rectL=(a,b)=>[[-a,-b,a,-b],[a,-b,a,b],[a,b,-a,b],[-a,b,-a,-b]].map(p=>({t:'l',p}));
+function basePrims(s,w,h){
+ const P=[],L=(a,b,c,d)=>P.push({t:'l',p:[a,b,c,d]});
+ if(s.kind==='circle'){const r=w/2;P.push({t:'c',x:0,y:0,r});
+  if(s.style==='sp')P.push({t:'c',x:0,y:0,r:r*.55});else{L(-r,0,r,0);L(0,-r,0,r)}}
+ else{const a=w/2,b=h/2;P.push(...rectL(a,b));
+  if(s.style==='fl'){const m=Math.min(w*.04,h*.2),y=h*.18;L(-a+m,y,a-m,y);L(-a+m,-y,a-m,-y)}
+  else if(s.style==='fan'){L(-a,-b,a,b);L(-a,b,a,-b);
+   if(Math.abs(a-b)<1e-6)P.push({t:'c',x:0,y:0,r:a*.8});
+   else P.push({t:'pl',closed:true,pts:arcPts(0,0,1,0,360,10).slice(0,-1).map(([x,y])=>[x*a*.8,y*b*.8])})}
+  else if(s.style==='ac'){const ia=a*.7,ib=b*.7;P.push(...rectL(ia,ib));for(const[sx,sy]of[[1,1],[1,-1],[-1,1],[-1,-1]])L(sx*a,sy*b,sx*ia,sy*ib)}}
+ return P}
+function scalePrims(P,sx,sy){const uni=Math.abs(sx-sy)<1e-9*Math.max(sx,sy),o=[];
+ for(const q of P){
+  if(q.t==='l')o.push({t:'l',p:[q.p[0]*sx,q.p[1]*sy,q.p[2]*sx,q.p[3]*sy]});
+  else if(q.t==='c'){if(uni)o.push({t:'c',x:q.x*sx,y:q.y*sy,r:q.r*sx});else o.push({t:'pl',closed:true,pts:arcPts(q.x,q.y,q.r,0,360,7.5).slice(0,-1).map(([x,y])=>[x*sx,y*sy])})}
+  else if(q.t==='a'){if(uni)o.push({t:'a',x:q.x*sx,y:q.y*sy,r:q.r*sx,a0:q.a0,a1:q.a1});else o.push({t:'pl',closed:false,pts:arcPts(q.x,q.y,q.r,q.a0,q.a1,5).map(([x,y])=>[x*sx,y*sy])})}
+  else o.push({t:'pl',closed:q.closed,pts:q.pts.map(([x,y])=>[x*sx,y*sy])})}
+ return o}
+const localPrims=(s,w,h)=>s.kind==='cad'?scalePrims(s.prims,w/s.w0,h/s.h0):basePrims(s,w,h);
+const f1=v=>(Math.round(v*10)/10);
+function primsSvg(P){let h='';
+ for(const q of P){
+  if(q.t==='l')h+=`<line class="fx" x1="${f1(q.p[0])}" y1="${f1(q.p[1])}" x2="${f1(q.p[2])}" y2="${f1(q.p[3])}"/>`;
+  else if(q.t==='c')h+=`<circle class="fx" cx="${f1(q.x)}" cy="${f1(q.y)}" r="${f1(q.r)}"/>`;
+  else if(q.t==='a')h+=`<polyline class="fx" points="${arcPts(q.x,q.y,q.r,q.a0,q.a1,5).map(p=>f1(p[0])+','+f1(p[1])).join(' ')}"/>`;
+  else h+=`<${q.closed?'polygon':'polyline'} class="fx" points="${q.pts.map(p=>f1(p[0])+','+f1(p[1])).join(' ')}"/>`}
+ return h}
+function symG(s,p,A,cls){
+ const w=p.w,h=p.h,t=Math.max(20,Math.min(w,h)*.12);
+ const hit=s.kind==='circle'?`<circle class="fxb" r="${f1(w/2)}"/>`:`<rect class="fxb" x="${f1(-w/2)}" y="${f1(-h/2)}" width="${f1(w)}" height="${f1(h)}"/>`;
+ return `<g class="fxs ${cls}" data-pid="${p.id}" transform="translate(${p.x.toFixed(1)},${p.y.toFixed(1)}) rotate(${(p.rot+A).toFixed(3)})">${hit}${primsSvg(localPrims(s,w,h))}<line class="fxc" x1="${-t}" y1="0" x2="${t}" y2="0"/><line class="fxc" x1="0" y1="${-t}" x2="0" y2="${t}"/></g>`}
+function fxHtml(){
+ const A=RESULT?RESULT.ang*180/Math.PI:0;let h='';
+ for(const p of FX.list){const s=symOf(p.sym);if(s)h+=symG(s,p,A,p.id===FX.sel?'sel':'')}
+ const g=FX.ghost;
+ if(g&&RESULT){const R=RESULT.ang,[bx0,bx1,by0,by1]=g.o.lay.bbox;
+  const gl=(a,b)=>{const p=rot(a,R),q=rot(b,R);return `<line class="sg" x1="${p[0].toFixed(1)}" y1="${p[1].toFixed(1)}" x2="${q[0].toFixed(1)}" y2="${q[1].toFixed(1)}"/>`};
+  if(g.sx)h+=gl([g.sx.v,by0],[g.sx.v,by1]);if(g.sy)h+=gl([bx0,g.sy.v],[bx1,g.sy.v]);
+  if(FX.tool==='place'){const s=symOf(FX.cur.sym);if(s)h+=symG(s,{id:0,x:g.x,y:g.y,w:FX.cur.w,h:FX.cur.h,rot:FX.cur.rot},A,'ghost')}}
+ return h}
+function drawFx(){
+ const g=document.getElementById('fxlayer');
+ const cnt={};for(const p of FX.list){const s=symOf(p.sym);if(s)cnt[s.name]=(cnt[s.name]||0)+1}
+ $('fxcnt').textContent=FX.list.length?'配置済み '+FX.list.length+'個: '+Object.entries(cnt).map(([k,v])=>k+' '+v).join(' / '):'';
+ if(g)g.innerHTML=fxHtml()}
+
+/* --- 吸着(目地芯 / 天井仕上材芯) --- */
+function fxSnap(wx,wy,k){
+ const R=RESULT;if(!R||!R.out.length)return null;
+ const pl=rot([wx,wy],-R.ang);
+ let o=R.out.find(q=>pip(pl,q.led));
+ if(!o){let bd=1e30;for(const q of R.out){const[a,b,c,d]=q.lay.bbox,dx=Math.max(a-pl[0],0,pl[0]-b),dy=Math.max(c-pl[1],0,pl[1]-d),dd=dx*dx+dy*dy;if(dd<bd){bd=dd;o=q}}}
+ const l=o.lay,thr=FX.thr*k,mode=FX.snap;
+ const ax=(v,org,pitch)=>{if(mode==='off')return null;let best=null,bd=thr;
+  const test=(c,ty)=>{const d=Math.abs(v-c);if(d<=bd){bd=d;best={v:c,ty}}};
+  const n0=Math.floor((v-org)/pitch);
+  for(let n=n0-1;n<=n0+2;n++){if(mode!=='center')test(org+n*pitch,'joint');if(mode!=='joint')test(org+(n+.5)*pitch,'center')}
+  return best};
+ const sx=ax(pl[0],l.ox,l.px),sy=ax(pl[1],l.oy,l.py);
+ const lx=sx?sx.v:pl[0],ly=sy?sy.v:pl[1],w=rot([lx,ly],R.ang);
+ return{x:w[0],y:w[1],lx,ly,o,sx,sy}}
+function fxInfo(g,pre){if(!g)return;const ty={joint:'目地芯',center:'板芯'},l=g.o.lay;
+ fxMsg((pre||'')+`室${g.o.room.no}  吸着 X:${g.sx?ty[g.sx.ty]:'なし'} / Y:${g.sy?ty[g.sy.ty]:'なし'}  位置 X=${Math.round(g.lx-l.bbox[0])} Y=${Math.round(g.ly-l.bbox[2])}mm(室の左下から)`)}
+function fxAt(e){const s=$('stage').querySelector('svg');if(!s)return null;const r=s.getBoundingClientRect();
+ return{wx:s._x+(e.clientX-r.left)/r.width*s._w,wy:-(s._y+(e.clientY-r.top)/r.height*s._h),k:s._w/r.width}}
+function fxHover(e){const a=fxAt(e);if(!a)return;FX.ghost=fxSnap(a.wx,a.wy,a.k);fxInfo(FX.ghost);drawFx()}
+function fxPlace(e){
+ if(!RESULT){fxMsg('先にJWWを読み込んでください。');return}
+ const a=fxAt(e),g=a&&fxSnap(a.wx,a.wy,a.k);if(!g)return;
+ FX.list.push({id:FX.seq++,sym:FX.cur.sym,x:g.x,y:g.y,w:FX.cur.w,h:FX.cur.h,rot:FX.cur.rot});
+ FX.ghost=g;fxInfo(g,'配置しました。 ');drawFx()}
+function fxDown(e,s){
+ if(FX.tool!=='sel')return false;
+ const t=e.target.closest&&e.target.closest('[data-pid]');if(!t)return false;
+ const id=+t.getAttribute('data-pid'),p=FX.list.find(q=>q.id===id);if(!p)return false;
+ const a=fxAt(e);FX.sel=id;FX.mv={id,ox:p.x-a.wx,oy:p.y-a.wy};syncInputs();s.setPointerCapture(e.pointerId);drawFx();return true}
+function fxMove(e){const p=FX.list.find(q=>q.id===FX.mv.id);if(!p)return;const a=fxAt(e);
+ const g=fxSnap(a.wx+FX.mv.ox,a.wy+FX.mv.oy,a.k);if(!g)return;p.x=g.x;p.y=g.y;FX.ghost=g;fxInfo(g);drawFx()}
+function fxEnd(){FX.mv=null;FX.ghost=null;drawFx()}
+function fxDeselect(){if(FX.sel){FX.sel=null;syncInputs();drawFx()}}
+function fxDelete(){if(!FX.sel)return;FX.list=FX.list.filter(p=>p.id!==FX.sel);FX.sel=null;syncInputs();drawFx()}
+
+/* --- 操作モード・入力欄 --- */
+function setTool(t){FX.tool=t;FX.ghost=null;FX.mv=null;
+ if(t!=='pan'&&PICK.on){PICK.on=false;PICK.sel=[];$('pick').setAttribute('aria-pressed','false');$('stage').classList.remove('pick');pickMsg('図の壁を同じ向きに2面クリックすると、その中間が芯になります。');if(RESULT)render()}
+ $('fxplace').setAttribute('aria-pressed',String(t==='place'));$('fxsel').setAttribute('aria-pressed',String(t==='sel'));
+ const st=$('stage');st.classList.toggle('fxplace',t==='place');st.classList.toggle('fxsel',t==='sel');
+ if(t==='place'&&FX.sel){FX.sel=null;syncInputs()}
+ drawFx()}
+const curTarget=()=>FX.sel?(FX.list.find(p=>p.id===FX.sel)||FX.cur):FX.cur;
+function syncInputs(){
+ const t=curTarget(),s=symOf(t.sym)||BUILTIN[3],c=s.kind==='circle';
+ $('fxwl').textContent=c?'外径Φ(mm)':'幅(mm)';$('fxhw').hidden=c;$('fxlockw').hidden=s.kind!=='cad';
+ $('fxw').value=num(t.w);$('fxh').value=num(t.h);$('fxrot').value=num(t.rot)}
+function onSize(which){
+ const t=curTarget(),s=symOf(t.sym);if(!s)return;
+ const v=n2($(which==='w'?'fxw':'fxh').value);
+ if(!(v>=1&&v<=50000)){syncInputs();return}
+ if(s.kind==='circle'){t.w=t.h=v}
+ else if(s.kind==='cad'&&$('fxlock').checked){const r=s.w0/s.h0;if(which==='w'){t.w=v;t.h=v/r}else{t.h=v;t.w=v*r}}
+ else t[which]=v;
+ syncInputs();drawFx()}
+function onRot(){const t=curTarget(),v=n2($('fxrot').value);t.rot=Number.isFinite(v)?((v%360)+360)%360:0;syncInputs();drawFx()}
+function rotate90(){const t=curTarget();t.rot=((t.rot||0)+90)%360;syncInputs();drawFx()}
+function pickSym(id){const s=symOf(id);if(!s)return;const d=defSize(s);FX.cur={sym:id,w:d[0],h:d[1],rot:FX.cur.rot||0};FX.sel=null;syncInputs();setTool('place');
+ fxMsg(`「${s.name}」を選択中。図面上をクリックして配置(Escで終了)。`)}
+const thumb=s=>{const d=defSize(s),w=d[0],h=d[1],m=Math.max(w,h)*.58;return `<svg class="th" viewBox="${-m} ${-m} ${m*2} ${m*2}"><g transform="scale(1,-1)">${primsSvg(localPrims(s,w,h))}</g></svg>`};
+function renderFxList(){
+ const el=$('fxlist');el.innerHTML='';
+ const cats=[...FXCATS,...new Set(allSyms().map(s=>s.cat).filter(c=>!FXCATS.includes(c)))];
+ for(const c of cats){const ss=allSyms().filter(s=>s.cat===c);if(!ss.length)continue;
+  const g=document.createElement('div');g.className='grp';g.textContent=c;el.append(g);
+  for(const s of ss){const d=defSize(s),l=document.createElement('label');l.className='mat';
+   l.innerHTML=`<input type="radio" name="fxsym" value="${esc(s.id)}"${s.id===FX.cur.sym?' checked':''}>${thumb(s)}<span>${esc(s.name)}<small>${s.kind==='circle'?'Φ'+d[0]:d[0]+'×'+d[1]}${s.kind==='cad'?' ・登録図形':''}</small></span>`;
+   l.querySelector('input').onchange=()=>pickSym(s.id);
+   l.querySelector('input').onclick=()=>pickSym(s.id);
+   if(s.kind==='cad'){const b=document.createElement('button');b.type='button';b.textContent='削除';b.className='reset';b.style.cssText='position:static;margin-left:auto';
+    b.onclick=ev=>{ev.preventDefault();ev.stopPropagation();USYM=USYM.filter(x=>x.id!==s.id);saveSyms();FX.list=FX.list.filter(p=>p.sym!==s.id);if(FX.cur.sym===s.id)FX.cur={sym:'b-dl',w:100,h:100,rot:0};syncInputs();renderFxList();drawFx()};l.append(b)}
+   el.append(l)}}
+ const sel=$('fxcat'),keep=sel.value;sel.innerHTML=cats.concat(cats.includes('その他')?[]:['その他']).map(c=>`<option>${esc(c)}</option>`).join('');if(keep)sel.value=keep}
+
+/* --- CAD登録(DXF / JWW) --- */
+function dxfPrims(txt){
+ const L=txt.split(/\r?\n/),P=[];for(let i=0;i+1<L.length;i+=2)P.push([parseInt(L[i],10),L[i+1].trim()]);
+ const all=[];let sec=null,e=null;
+ for(const[c,v]of P){
+  if(c===0){if(e)all.push(e);e=null;if(v==='SECTION')sec='?';else if(v==='ENDSEC')sec=null;else if(v==='EOF')break;else e={t:v,sec,f:{}};continue}
+  if(c===2&&sec==='?'){sec=v;continue}
+  if(e)(e.f[c]=e.f[c]||[]).push(v)}
+ if(e)all.push(e);
+ const num=(x,c,i=0)=>parseFloat((x.f[c]||[])[i]);
+ const conv=list=>{const out=[];let poly=null;
+  for(const x of list){
+   if(x.t==='LINE')out.push({t:'l',p:[num(x,10),num(x,20),num(x,11),num(x,21)]});
+   else if(x.t==='CIRCLE')out.push({t:'c',x:num(x,10),y:num(x,20),r:num(x,40)});
+   else if(x.t==='ARC')out.push({t:'a',x:num(x,10),y:num(x,20),r:num(x,40),a0:num(x,50),a1:num(x,51)});
+   else if(x.t==='LWPOLYLINE'){const xs=x.f[10]||[],ys=x.f[20]||[];out.push({t:'pl',closed:(parseInt((x.f[70]||[0])[0],10)&1)===1,pts:xs.map((v,i)=>[parseFloat(v),parseFloat(ys[i])])})}
+   else if(x.t==='POLYLINE')poly={closed:(parseInt((x.f[70]||[0])[0],10)&1)===1,pts:[]};
+   else if(x.t==='VERTEX'&&poly)poly.pts.push([num(x,10),num(x,20)]);
+   else if(x.t==='SEQEND'&&poly){out.push({t:'pl',...poly});poly=null}}
+  return out.filter(q=>q.t==='l'?q.p.every(Number.isFinite):q.t==='c'?[q.x,q.y,q.r].every(Number.isFinite)&&q.r>0:q.t==='a'?[q.x,q.y,q.r,q.a0,q.a1].every(Number.isFinite)&&q.r>0:q.pts.length>1&&q.pts.every(p=>p.every(Number.isFinite)))};
+ const a=conv(all.filter(x=>x.sec==='ENTITIES'));
+ return a.length?a:conv(all.filter(x=>x.sec==='BLOCKS'))}
+function jwwPrims(buf,filt){
+ const t=parseJww(buf),info={enko:[]};try{walk(buf,t.ver,t.listPos,info)}catch(e){}
+ const f=filt&&layerSpec(filt),ok=e=>!f||(e.glayer===f[0]&&e.layer===f[1]),P=[];
+ for(const e of t.lines)if(ok(e)){const sc=t.scales[e.glayer]||1;P.push({t:'l',p:e.xy.map(v=>v*sc)})}
+ for(const e of info.enko)if(ok(e)){const sc=t.scales[e.glayer]||1,[cx,cy,r,a0,sw]=e.v;if(!(r>0))continue;
+  if(e.z||sw>=Math.PI*2-1e-6||sw<=0)P.push({t:'c',x:cx*sc,y:cy*sc,r:r*sc});
+  else P.push({t:'a',x:cx*sc,y:cy*sc,r:r*sc,a0:a0*180/Math.PI,a1:(a0+sw)*180/Math.PI})}
+ return P}
+function normPrims(prims,k){
+ const S=v=>v*k,P=prims.map(q=>q.t==='l'?{t:'l',p:q.p.map(S)}:q.t==='c'?{t:'c',x:S(q.x),y:S(q.y),r:S(q.r)}:q.t==='a'?{t:'a',x:S(q.x),y:S(q.y),r:S(q.r),a0:q.a0,a1:q.a1}:{t:'pl',closed:q.closed,pts:q.pts.map(p=>[S(p[0]),S(p[1])])});
+ const xs=[],ys=[];
+ for(const q of P){if(q.t==='l'){xs.push(q.p[0],q.p[2]);ys.push(q.p[1],q.p[3])}
+  else if(q.t==='c'){xs.push(q.x-q.r,q.x+q.r);ys.push(q.y-q.r,q.y+q.r)}
+  else if(q.t==='a'){for(const[x,y]of arcPts(q.x,q.y,q.r,q.a0,q.a1,6)){xs.push(x);ys.push(y)}}
+  else for(const[x,y]of q.pts){xs.push(x);ys.push(y)}}
+ let x0=1e30,x1=-1e30,y0=1e30,y1=-1e30;for(const v of xs){if(v<x0)x0=v;if(v>x1)x1=v}for(const v of ys){if(v<y0)y0=v;if(v>y1)y1=v}
+ const cx=(x0+x1)/2,cy=(y0+y1)/2,r2=v=>Math.round(v*100)/100;
+ const Q=P.map(q=>q.t==='l'?{t:'l',p:[r2(q.p[0]-cx),r2(q.p[1]-cy),r2(q.p[2]-cx),r2(q.p[3]-cy)]}:q.t==='c'?{t:'c',x:r2(q.x-cx),y:r2(q.y-cy),r:r2(q.r)}:q.t==='a'?{t:'a',x:r2(q.x-cx),y:r2(q.y-cy),r:r2(q.r),a0:r2(q.a0),a1:r2(q.a1)}:{t:'pl',closed:q.closed,pts:q.pts.map(p=>[r2(p[0]-cx),r2(p[1]-cy)])});
+ return{prims:Q,w0:Math.max(1,r2(x1-x0)),h0:Math.max(1,r2(y1-y0))}}
+async function fxRegister(files){
+ const k=n2($('fxk').value)||1,cat=$('fxcat').value||'その他',multi=files.length>1;let ok=0,last=null;const msgs=[];
+ for(const f of files){
+  try{const ext=(f.name.split('.').pop()||'').toLowerCase(),buf=await f.arrayBuffer();
+   const raw=ext==='jww'?jwwPrims(buf,$('fxlf').value.trim()):dxfPrims(new TextDecoder('utf-8').decode(buf));
+   if(!raw.length){msgs.push(f.name+': 線・円・円弧が見つかりませんでした(DXFはASCII形式、JWWは取込レイヤ指定を確認)。');continue}
+   if(raw.length>5000){msgs.push(f.name+': 図形が多すぎます(5000要素まで)。');continue}
+   const nm=normPrims(raw,k),base=f.name.replace(/\.[^.]+$/,'');
+   const s={id:'u-'+Date.now().toString(36)+Math.random().toString(36).slice(2,5),cat,name:(!multi&&$('fxnm').value.trim())||base,kind:'cad',w0:nm.w0,h0:nm.h0,prims:nm.prims};
+   USYM.push(s);last=s;ok++;msgs.push(`${f.name}: 登録(${Math.round(nm.w0)}×${Math.round(nm.h0)}mm・${raw.length}要素)`)}
+  catch(err){msgs.push(f.name+': 読み込めませんでした('+err.message+')')}}
+ if(ok){saveSyms();renderFxList();if(last)pickSym(last.id);$('fxnm').value=''}
+ regMsg(msgs.join(' / '))}
+
+/* --- 出力用(JWW・DXF) --- */
+function worldPrims(){
+ const R=RESULT,out=[];if(!R)return out;
+ for(const p of FX.list){const s=symOf(p.sym);if(!s)continue;const a=R.ang+p.rot*Math.PI/180,ad=a*180/Math.PI;
+  const T=(x,y)=>{const q=rot([x,y],a);return[q[0]+p.x,q[1]+p.y]};
+  for(const q of localPrims(s,p.w,p.h)){
+   if(q.t==='l')out.push({t:'l',a:T(q.p[0],q.p[1]),b:T(q.p[2],q.p[3])});
+   else if(q.t==='c')out.push({t:'c',c:T(q.x,q.y),r:q.r});
+   else if(q.t==='a')out.push({t:'a',c:T(q.x,q.y),r:q.r,a0:q.a0+ad,a1:q.a1+ad});
+   else for(let i=0;i<q.pts.length-(q.closed?0:1);i++){const u=q.pts[i],v=q.pts[(i+1)%q.pts.length];out.push({t:'l',a:T(u[0],u[1]),b:T(v[0],v[1])})}}}
+ return out}
+function fixtureItems(){
+ if(!RESULT||!FX.list.length)return[];
+ const sc=RESULT.scale,sp=layerSpec($('fxl').value)||layerSpec($('dst').value)||[14,15];
+ const base={layer:sp[1],glayer:sp[0],color:6,style:1,width:0},TP=Math.PI*2,out=[];
+ for(const q of worldPrims()){
+  if(q.t==='l')out.push({...base,t:'sen',xy:[q.a[0]/sc,q.a[1]/sc,q.b[0]/sc,q.b[1]/sc]});
+  else if(q.t==='c')out.push({...base,t:'enko',c:[q.c[0]/sc,q.c[1]/sc],r:q.r/sc,a0:0,sw:TP,full:1});
+  else{const a0=(((q.a0%360)+360)%360)*Math.PI/180;let sw=((((q.a1-q.a0)%360)+360)%360)*Math.PI/180;if(sw<1e-9)sw=TP;
+   out.push({...base,t:'enko',c:[q.c[0]/sc,q.c[1]/sc],r:q.r/sc,a0,sw,full:0})}}
+ return out}
+function fixtureDxf(o){
+ for(const q of worldPrims()){
+  if(q.t==='l')o.push('0','LINE','8','FIXTURE','10',q.a[0].toFixed(3),'20',q.a[1].toFixed(3),'30','0.0','11',q.b[0].toFixed(3),'21',q.b[1].toFixed(3),'31','0.0');
+  else if(q.t==='c')o.push('0','CIRCLE','8','FIXTURE','10',q.c[0].toFixed(3),'20',q.c[1].toFixed(3),'30','0.0','40',q.r.toFixed(3));
+  else o.push('0','ARC','8','FIXTURE','10',q.c[0].toFixed(3),'20',q.c[1].toFixed(3),'30','0.0','40',q.r.toFixed(3),'50',(((q.a0%360)+360)%360).toFixed(3),'51',(((q.a1%360)+360)%360).toFixed(3))}}
+
+/* --- UI結線 --- */
+(function initFx(){
+ renderFxList();syncInputs();
+ $('fxplace').onclick=()=>setTool(FX.tool==='place'?'pan':'place');
+ $('fxsel').onclick=()=>setTool(FX.tool==='sel'?'pan':'sel');
+ $('fxrot90').onclick=rotate90;$('fxdel').onclick=fxDelete;
+ let clr=0;$('fxclr').onclick=()=>{const b=$('fxclr');if(!clr){b.textContent='もう一度で全削除';clr=setTimeout(()=>{clr=0;b.textContent='全削除'},3000);return}
+  clearTimeout(clr);clr=0;b.textContent='全削除';FX.list=[];FX.sel=null;syncInputs();drawFx();fxMsg('配置した器具をすべて削除しました。')};
+ $('fxw').addEventListener('change',()=>onSize('w'));$('fxh').addEventListener('change',()=>onSize('h'));$('fxrot').addEventListener('change',onRot);
+ document.querySelectorAll('.fseg button').forEach(b=>b.onclick=()=>{FX.snap=b.dataset.snap;document.querySelectorAll('.fseg button').forEach(x=>x.setAttribute('aria-pressed',String(x===b)))});
+ $('fxreg').onclick=()=>$('fxregfile').click();
+ $('fxregfile').onchange=e=>{const fs=[...e.target.files];e.target.value='';if(fs.length)fxRegister(fs)};
+ $('fxexp').onclick=()=>{if(!USYM.length){regMsg('登録図形がありません。');return}save('fixture_library.json',JSON.stringify(USYM))};
+ $('fximp').onclick=()=>$('fximpfile').click();
+ $('fximpfile').onchange=e=>{const f=e.target.files[0];e.target.value='';if(!f)return;
+  f.text().then(t=>{const a=JSON.parse(t);if(!Array.isArray(a))throw new Error('形式が違います');let n=0;
+   for(const s of a)if(s&&s.kind==='cad'&&Array.isArray(s.prims)&&s.w0>0&&s.h0>0){USYM.push({...s,id:'u-'+Date.now().toString(36)+Math.random().toString(36).slice(2,5)});n++}
+   saveSyms();renderFxList();regMsg(n+'件を読み込みました。')}).catch(err=>regMsg('読み込めませんでした: '+err.message))};
+ document.addEventListener('keydown',e=>{const t=e.target;if(t&&/^(INPUT|SELECT|TEXTAREA)$/.test(t.tagName))return;
+  if(e.key==='Escape'){if(FX.tool!=='pan'||FX.sel){FX.sel=null;setTool('pan');syncInputs()}}
+  else if(FX.tool==='pan')return;
+  else if((e.key==='Delete'||e.key==='Backspace')&&FX.sel){e.preventDefault();fxDelete()}
+  else if(e.key==='r'||e.key==='R')rotate90()});
+})();
 
 /* ---------- UI ---------- */
 /* ---------- 入れ込み先JWWへの追記 ---------- */
@@ -659,7 +974,7 @@ function mergeJww(tgt,lines){
  out.set(body,info.end);
  out.set(src.subarray(info.end),info.end+p);
  const chk=parseJww(out.buffer),ci={};
- if(chk.warn.length||chk.lines.length!==tgt.lines.length+lines.filter(e=>e.t!=='moji').length)throw new Error('追記後の検証に失敗しました');
+ if(chk.warn.length||chk.lines.length!==tgt.lines.length+lines.filter(e=>e.t==='sen').length)throw new Error('追記後の検証に失敗しました');
  walk(out.buffer,ver,tgt.listPos,ci);if(ci.n!==n||ci.end!==info.end+p)throw new Error('追記後の検証に失敗しました');
  return out;
 }
@@ -680,7 +995,7 @@ $('dlmerge').onclick=()=>{
  if(!RESULT.newLines.length){msg('割付線がありません。');return}
  try{
   const lines=jwwItems().map(e=>{const ts=TGT.scales[e.glayer];if(!(ts>0))throw new Error('入れ込み先の縮尺を取得できません');
-   const k=RESULT.scale/ts;return e.t==='moji'?{...e,x:e.x*k,y:e.y*k,ex:e.ex*k,ey:e.ey*k,size:e.size*k}:{...e,xy:e.xy.map(v=>v*k)}});
+   const k=RESULT.scale/ts;return e.t==='moji'?{...e,x:e.x*k,y:e.y*k,ex:e.ex*k,ey:e.ey*k,size:e.size*k}:e.t==='enko'?{...e,c:e.c.map(v=>v*k),r:e.r*k}:{...e,xy:e.xy.map(v=>v*k)}});
   const out=mergeJww(TGT,lines),stem=stemOf(TGT.name,'target');
   msg(`${TGT.name}: 割付線${lines.filter(e=>e.t!=='moji').length}本(目地注記${lines.filter(e=>e.t==='moji').length}件)を追加しました。保存してください。`);
   STANDALONE?save(stem+'_merged.jww',out):save(stem+'_merged.zip',zip([{name:stem+'_merged.jww',data:out}]))
@@ -706,7 +1021,7 @@ $('zoomj').onclick=()=>{if(!RESULT)return;const o=RESULT.out[0],l=o.lay,a=o.ang!
 $('reset').onclick=()=>{vb={...fullVb};applyVb()};
 window.addEventListener('resize',applyVb);
 function load(buf,name){
- try{SRC=parseJww(buf);fileName=name;$('fname').textContent=name;selRooms=null;vb=null;OVR={};PICK.sel=[];compute()}
+ try{SRC=parseJww(buf);FX.list=[];FX.sel=null;FX.ghost=null;fileName=name;$('fname').textContent=name;selRooms=null;vb=null;OVR={};PICK.sel=[];compute()}
  catch(e){showWarn(['読み込めませんでした: '+e.message])}
 }
 const drop=$('drop');
